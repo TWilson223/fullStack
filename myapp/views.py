@@ -1,5 +1,6 @@
-# from django.http import HttpResponse
+from django.http import HttpResponse
 from django.shortcuts import render
+from django.views.decorators.csrf import csrf_exempt
 
 from . import models
 from django.core import serializers
@@ -22,13 +23,35 @@ def book(request):
     context = {'form':form}
     return render(request, 'book.html', context)
 
-# Add code for the bookings() view
-def bookings(request):
+def reservations(request):
     date = request.GET.get('date',datetime.today().date())
     bookings = models.Booking.objects.all()
     booking_json = serializers.serialize('json', bookings)
 
     return render(request, 'bookings.html', {"bookings" : booking_json})
+
+@csrf_exempt
+def bookings(request):
+    if request.method == 'POST':
+        data = json.load(request)
+        exist = models.Booking.objects.filter(reservation_date=data['reservation_date']).filter(
+            reservation_slot=data['reservation_slot']).exists()
+        if exist==False:
+            booking = models.Booking(
+                first_name=data['first_name'],
+                reservation_date=data['reservation_date'],
+                reservation_slot=data['reservation_slot'],
+            )
+            booking.save()
+        else:
+            return HttpResponse("{'error':1}", content_type='application/json')
+    
+    date = request.GET.get('date',datetime.today().date())
+
+    bookings = models.Booking.objects.all().filter(reservation_date=date)
+    booking_json = serializers.serialize('json', bookings)
+
+    return HttpResponse(booking_json, content_type='application/json')
 
 def menu(request):
     menu_data = models.Menu.objects.all()
